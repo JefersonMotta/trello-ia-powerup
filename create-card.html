@@ -97,7 +97,7 @@
     try {
       var response = await claudeChat([
         { role: 'user', content: 'Crie um card do Trello com base na seguinte descrição: ' + prompt + '\n\nResponda APENAS com um JSON válido no formato:\n{"name": "título do card", "desc": "descrição detalhada do card"}' }
-      ], cfg.openaiKey);
+      ], cfg.geminiKey);
 
       // Extrai JSON da resposta
       var match = response.match(/\{[\s\S]*\}/);

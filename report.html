@@ -119,7 +119,7 @@
 
       var report = await claudeChat([
         { role: 'user', content: 'Com base no seguinte estado do board Trello:\n\n' + boardSummary + '\n\n' + prompt + '\n\nSeja objetivo e prático. Use markdown simples (listas, negrito).' }
-      ], cfg.openaiKey);
+      ], cfg.geminiKey);
 
       document.getElementById('reportContent').textContent = report;
       document.getElementById('result').style.display = 'block';
