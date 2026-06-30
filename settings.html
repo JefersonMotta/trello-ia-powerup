@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; padding: 12px; background: #fff; color: #172b4d; }
+    label { display: block; font-weight: 600; margin: 10px 0 4px; color: #5e6c84; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    input { width: 100%; padding: 6px 8px; border: 1px solid #dfe1e6; border-radius: 3px; font-size: 13px; outline: none; }
+    input:focus { border-color: #0079bf; box-shadow: 0 0 0 2px rgba(0,121,191,.2); }
+    .hint { font-size: 11px; color: #97a0af; margin-top: 3px; }
+    .hint a { color: #0079bf; }
+    button { margin-top: 14px; width: 100%; padding: 8px; background: #0079bf; color: #fff; border: none; border-radius: 3px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #026aa7; }
+    #msg { margin-top: 8px; text-align: center; font-size: 12px; }
+    .ok { color: #5aac44; }
+    .err { color: #eb5a46; }
+  </style>
+</head>
+<body>
+  <label>Trello API Key</label>
+  <input id="trelloKey" type="password" placeholder="Cole sua Trello API Key">
+  <p class="hint">Obtenha em <a href="https://trello.com/app-key" target="_blank">trello.com/app-key</a></p>
+
+  <label>Trello Token</label>
+  <input id="trelloToken" type="password" placeholder="Cole seu Trello Token">
+
+  <label>Claude API Key</label>
+  <input id="claudeKey" type="password" placeholder="sk-ant-...">
+  <p class="hint">Obtenha em <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+
+  <button id="saveBtn">Salvar Configurações</button>
+  <p id="msg"></p>
+
+<script src="./shared.js"></script>
+<script>
+  var t = TrelloPowerUp.iframe();
+
+  // Carrega valores salvos
+  getConfig(t).then(function(cfg) {
+    if (cfg.trelloKey) document.getElementById('trelloKey').value = cfg.trelloKey;
+    if (cfg.trelloToken) document.getElementById('trelloToken').value = cfg.trelloToken;
+    if (cfg.claudeKey) document.getElementById('claudeKey').value = cfg.claudeKey;
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async function() {
+    var btn = this;
+    var key = document.getElementById('trelloKey').value.trim();
+    var token = document.getElementById('trelloToken').value.trim();
+    var claude = document.getElementById('claudeKey').value.trim();
+
+    if (!key || !token || !claude) {
+      document.getElementById('msg').textContent = 'Preencha todos os campos.';
+      document.getElementById('msg').className = 'err';
+      return;
+    }
+
+    setLoading(btn, true, 'Salvar Configurações');
+
+    try {
+      await Promise.all([
+        t.set('member', 'private', 'trelloKey', key),
+        t.set('member', 'private', 'trelloToken', token),
+        t.set('member', 'private', 'claudeKey', claude)
+      ]);
+      document.getElementById('msg').textContent = '✓ Salvo com sucesso!';
+      document.getElementById('msg').className = 'ok';
+    } catch (e) {
+      document.getElementById('msg').textContent = 'Erro ao salvar: ' + e.message;
+      document.getElementById('msg').className = 'err';
+    }
+
+    setLoading(btn, false, 'Salvar Configurações');
+  });
+</script>
+</body>
+</html>

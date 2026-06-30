@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; padding: 12px; background: #fff; color: #172b4d; }
+    h3 { font-size: 14px; margin-bottom: 4px; word-break: break-word; }
+    .current-list { font-size: 11px; color: #97a0af; margin-bottom: 14px; }
+    label { display: block; font-weight: 600; margin: 10px 0 4px; color: #5e6c84; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    select { width: 100%; padding: 6px 8px; border: 1px solid #dfe1e6; border-radius: 3px; font-size: 13px; outline: none; }
+    select:focus { border-color: #0079bf; }
+    .btn { display: block; width: 100%; padding: 8px; border: none; border-radius: 3px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .btn-blue { background: #0079bf; color: #fff; }
+    .btn-blue:hover:not(:disabled) { background: #026aa7; }
+    .btn-red { background: #eb5a46; color: #fff; }
+    .btn-red:hover:not(:disabled) { background: #cf513d; }
+    .btn:disabled { opacity: .6; cursor: default; }
+    .divider { border: none; border-top: 1px solid #dfe1e6; margin: 14px 0; }
+    #error { display: none; margin-top: 8px; padding: 6px 8px; background: #ffebe6; border: 1px solid #ffbdad; border-radius: 3px; font-size: 12px; color: #bf2600; }
+    #success { display: none; margin-top: 8px; padding: 6px 8px; background: #e3fcef; border: 1px solid #abf5d1; border-radius: 3px; font-size: 12px; color: #006644; }
+  </style>
+</head>
+<body>
+
+<div id="loading" style="color:#97a0af;padding:20px 0;text-align:center">Carregando...</div>
+<div id="content" style="display:none">
+  <h3 id="cardName"></h3>
+  <p class="current-list">Lista atual: <strong id="cardList"></strong></p>
+
+  <label>Mover para lista</label>
+  <select id="listSelect"></select>
+  <button class="btn btn-blue" id="btnMove">Mover Card</button>
+
+  <hr class="divider">
+
+  <button class="btn btn-red" id="btnArchive">Arquivar Card</button>
+
+  <div id="error"></div>
+  <div id="success"></div>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+  var t = TrelloPowerUp.iframe();
+  var cfg = null;
+  var card = null;
+
+  async function init() {
+    cfg = await getConfig(t);
+    if (!configOk(cfg)) {
+      document.getElementById('loading').textContent = 'Configure as chaves de API nas Configurações do Power-Up.';
+      return;
+    }
+
+    try {
+      var [cardData, board] = await Promise.all([
+        t.card('id', 'name', 'idList'),
+        t.board('id')
+      ]);
+      card = cardData;
+
+      var lists = await trelloFetch('GET', '/boards/' + board.id + '/lists?filter=open', cfg);
+
+      document.getElementById('cardName').textContent = card.name;
+
+      var currentList = lists.find(function(l) { return l.id === card.idList; });
+      document.getElementById('cardList').textContent = currentList ? currentList.name : '—';
+
+      var sel = document.getElementById('listSelect');
+      sel.innerHTML = lists
+        .filter(function(l) { return l.id !== card.idList; })
+        .map(function(l) { return '<option value="' + l.id + '">' + l.name + '</option>'; })
+        .join('');
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+    } catch (e) {
+      document.getElementById('loading').textContent = 'Erro: ' + e.message;
+    }
+  }
+
+  document.getElementById('btnMove').addEventListener('click', async function() {
+    hideError();
+    var targetList = document.getElementById('listSelect').value;
+    if (!targetList) { showError('Selecione uma lista de destino.'); return; }
+
+    setLoading(this, true, 'Mover Card');
+
+    try {
+      await trelloFetch('PUT', '/cards/' + card.id, cfg, { idList: targetList });
+      var sel = document.getElementById('listSelect');
+      var listName = sel.options[sel.selectedIndex].text;
+      document.getElementById('success').textContent = '✓ Card movido para "' + listName + '"!';
+      document.getElementById('success').style.display = 'block';
+      setTimeout(function() { t.closePopup(); }, 1200);
+    } catch (e) {
+      showError('Erro ao mover: ' + e.message);
+      setLoading(this, false, 'Mover Card');
+    }
+  });
+
+  document.getElementById('btnArchive').addEventListener('click', async function() {
+    hideError();
+    if (!confirm('Arquivar este card?')) return;
+
+    setLoading(this, true, 'Arquivar Card');
+
+    try {
+      await trelloFetch('PUT', '/cards/' + card.id, cfg, { closed: true });
+      document.getElementById('success').textContent = '✓ Card arquivado!';
+      document.getElementById('success').style.display = 'block';
+      setTimeout(function() { t.closePopup(); }, 1200);
+    } catch (e) {
+      showError('Erro ao arquivar: ' + e.message);
+      setLoading(this, false, 'Arquivar Card');
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; padding: 12px; background: #fff; color: #172b4d; }
+    label { display: block; font-weight: 600; margin: 10px 0 4px; color: #5e6c84; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    textarea, select, input { width: 100%; padding: 6px 8px; border: 1px solid #dfe1e6; border-radius: 3px; font-size: 13px; font-family: inherit; outline: none; resize: vertical; }
+    textarea:focus, select:focus, input:focus { border-color: #0079bf; box-shadow: 0 0 0 2px rgba(0,121,191,.2); }
+    .row { display: flex; gap: 8px; }
+    .row > div { flex: 1; }
+    button { margin-top: 12px; width: 100%; padding: 8px; background: #0079bf; color: #fff; border: none; border-radius: 3px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    button:hover:not(:disabled) { background: #026aa7; }
+    button:disabled { opacity: .6; cursor: default; }
+    #preview { margin-top: 12px; display: none; }
+    #preview h4 { font-size: 12px; color: #5e6c84; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+    .card-preview { border: 1px solid #dfe1e6; border-radius: 3px; padding: 10px; background: #f4f5f7; }
+    .card-preview strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .card-preview p { font-size: 12px; color: #5e6c84; white-space: pre-wrap; }
+    #error { display: none; margin-top: 8px; padding: 6px 8px; background: #ffebe6; border: 1px solid #ffbdad; border-radius: 3px; font-size: 12px; color: #bf2600; }
+    #btnCreate { display: none; background: #5aac44; }
+    #btnCreate:hover:not(:disabled) { background: #519b3e; }
+    .nocfg { padding: 20px; text-align: center; color: #5e6c84; }
+    .nocfg a { color: #0079bf; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div id="main">
+  <label>Descreva o card que deseja criar</label>
+  <textarea id="prompt" rows="4" placeholder="Ex: Criar uma tarefa de revisão do relatório financeiro de junho, prioridade alta, responsável pelo time de finanças..."></textarea>
+
+  <label>Lista de destino</label>
+  <select id="listSelect"><option value="">Carregando listas...</option></select>
+
+  <button id="btnGerar">Gerar com IA</button>
+  <div id="error"></div>
+
+  <div id="preview">
+    <h4>Card gerado:</h4>
+    <div class="card-preview">
+      <strong id="previewName"></strong>
+      <p id="previewDesc"></p>
+    </div>
+    <button id="btnCreate">Criar este Card no Trello</button>
+  </div>
+</div>
+
+<div id="nocfg" class="nocfg" style="display:none">
+  <p>Configure as chaves de API antes de usar.</p>
+  <p><a id="openSettings">Abrir Configurações</a></p>
+</div>
+
+<script src="./shared.js"></script>
+<script>
+  var t = TrelloPowerUp.iframe();
+  var cfg = null;
+  var generatedCard = null;
+
+  async function init() {
+    cfg = await getConfig(t);
+    if (!configOk(cfg)) {
+      document.getElementById('main').style.display = 'none';
+      document.getElementById('nocfg').style.display = 'block';
+      return;
+    }
+
+    // Carrega listas do board
+    try {
+      var board = await t.board('id');
+      var lists = await trelloFetch('GET', '/boards/' + board.id + '/lists?filter=open', cfg);
+      var sel = document.getElementById('listSelect');
+      sel.innerHTML = lists.map(function(l) {
+        return '<option value="' + l.id + '">' + l.name + '</option>';
+      }).join('');
+    } catch (e) {
+      showError('Erro ao carregar listas: ' + e.message);
+    }
+  }
+
+  document.getElementById('openSettings').addEventListener('click', function() {
+    t.popup({ title: 'Configurações', url: t.signUrl('./settings.html'), height: 340 });
+  });
+
+  document.getElementById('btnGerar').addEventListener('click', async function() {
+    hideError();
+    var prompt = document.getElementById('prompt').value.trim();
+    if (!prompt) { showError('Descreva o card desejado.'); return; }
+
+    setLoading(this, true, 'Gerar com IA');
+    document.getElementById('preview').style.display = 'none';
+    document.getElementById('btnCreate').style.display = 'none';
+
+    try {
+      var response = await claudeChat([
+        { role: 'user', content: 'Crie um card do Trello com base na seguinte descrição: ' + prompt + '\n\nResponda APENAS com um JSON válido no formato:\n{"name": "título do card", "desc": "descrição detalhada do card"}' }
+      ], cfg.claudeKey);
+
+      // Extrai JSON da resposta
+      var match = response.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Resposta da IA em formato inválido.');
+      generatedCard = JSON.parse(match[0]);
+
+      document.getElementById('previewName').textContent = generatedCard.name;
+      document.getElementById('previewDesc').textContent = generatedCard.desc || '(sem descrição)';
+      document.getElementById('preview').style.display = 'block';
+      document.getElementById('btnCreate').style.display = 'block';
+    } catch (e) {
+      showError(e.message);
+    }
+
+    setLoading(this, false, 'Gerar com IA');
+  });
+
+  document.getElementById('btnCreate').addEventListener('click', async function() {
+    if (!generatedCard) return;
+    var listId = document.getElementById('listSelect').value;
+    if (!listId) { showError('Selecione uma lista.'); return; }
+
+    setLoading(this, true, 'Criar este Card no Trello');
+
+    try {
+      await trelloFetch('POST', '/cards', cfg, {
+        name: generatedCard.name,
+        desc: generatedCard.desc || '',
+        idList: listId
+      });
+      t.closePopup();
+    } catch (e) {
+      showError('Erro ao criar card: ' + e.message);
+      setLoading(this, false, 'Criar este Card no Trello');
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>
