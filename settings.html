@@ -26,9 +26,9 @@
   <label>Trello Token</label>
   <input id="trelloToken" type="password" placeholder="Cole seu Trello Token">
 
-  <label>Claude API Key</label>
-  <input id="claudeKey" type="password" placeholder="sk-ant-...">
-  <p class="hint">Obtenha em <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+  <label>OpenAI API Key</label>
+  <input id="openaiKey" type="password" placeholder="sk-...">
+  <p class="hint">Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></p>
 
   <button id="saveBtn">Salvar Configurações</button>
   <p id="msg"></p>
@@ -41,14 +41,14 @@
   getConfig(t).then(function(cfg) {
     if (cfg.trelloKey) document.getElementById('trelloKey').value = cfg.trelloKey;
     if (cfg.trelloToken) document.getElementById('trelloToken').value = cfg.trelloToken;
-    if (cfg.claudeKey) document.getElementById('claudeKey').value = cfg.claudeKey;
+    if (cfg.openaiKey) document.getElementById('openaiKey').value = cfg.openaiKey;
   });
 
   document.getElementById('saveBtn').addEventListener('click', async function() {
     var btn = this;
     var key = document.getElementById('trelloKey').value.trim();
     var token = document.getElementById('trelloToken').value.trim();
-    var claude = document.getElementById('claudeKey').value.trim();
+    var claude = document.getElementById('openaiKey').value.trim();
 
     if (!key || !token || !claude) {
       document.getElementById('msg').textContent = 'Preencha todos os campos.';
@@ -62,7 +62,7 @@
       await Promise.all([
         t.set('member', 'private', 'trelloKey', key),
         t.set('member', 'private', 'trelloToken', token),
-        t.set('member', 'private', 'claudeKey', claude)
+        t.set('member', 'private', 'openaiKey', claude)
       ]);
       document.getElementById('msg').textContent = '✓ Salvo com sucesso!';
       document.getElementById('msg').className = 'ok';
